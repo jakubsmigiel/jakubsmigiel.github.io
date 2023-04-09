@@ -27,6 +27,6 @@ Now, I could add one more character to the flag and see if the average "Exec Tim
 
 In this case, with added `r`, the "Exec Time" was reliably longer than for other characters. Other characters had a shorter "Exec Time" because the pattern didn't match before getting to the DoS part.
 
-I ran this process automatically in Python, trying all characters in `strings.printable` except whitespace, at each step adding the letter that had the longest "Exec Time" until I got the entire flag.
+I ran this process automatically in Python, trying all characters in `string.printable` except whitespace, at each step adding the letter that had the longest "Exec Time" until I got the entire flag.
 
 The server died a couple times during the challenge with too many tiny DoS patterns, meant to cause tiny delays, in requests from many contestants, compounding to DDoSing the server.
