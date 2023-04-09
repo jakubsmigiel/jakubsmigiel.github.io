@@ -884,7 +884,7 @@
         <p>In this case, with added <code>r</code>, the &quot;Exec Time&quot; was reliably longer than for other
           characters. Other characters had a shorter &quot;Exec Time&quot; because the pattern didn&apos;t match before
           getting to the DoS part.</p>
-        <p>I ran this process automatically in Python, trying all characters in <code>strings.printable</code> except
+        <p>I ran this process automatically in Python, trying all characters in <code>string.printable</code> except
           whitespace, at each step adding the letter that had the longest &quot;Exec Time&quot; until I got the entire
           flag.</p>
         <p>The server died a couple times during the challenge with too many tiny DoS patterns, meant to cause tiny
