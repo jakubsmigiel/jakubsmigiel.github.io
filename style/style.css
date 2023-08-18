@@ -1,0 +1,85 @@
+@font-face {
+    font-family: "ibmvga";
+    src: url("fonts/ibmvga/ibmvga.woff") format("woff");
+}
+
+body {
+    background-color: #080708; 
+    color: #F5F0F6;
+    font-family: 'Courier New', Courier, monospace;
+
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+}
+
+article {
+    padding: 1em;
+    margin: 0 auto;
+    max-width: min(60em, 100vw);
+    overflow-x: hidden;
+}
+
+footer {
+    margin-top: auto;
+    text-align: center;
+    margin-bottom: 0.2em;
+}
+
+img {
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    max-width: min(60em, 95vw);
+    max-height: min(60em, 80vh);
+}
+
+a, .link, .blue {
+    color: #4076ff;
+}
+
+a::after, .link-after, .blue-darker {
+    color: #3562d6;
+}
+
+h1, h2, h3, h4, h5, h6, .ibmvga {
+    font-family: "ibmvga";
+}
+
+h1 {
+    font-size: 2.5em;
+}
+
+h2 {
+    font-size: 2em;
+}
+
+h3 {
+    font-size: 1.5em;
+}
+
+h4 {
+    font-size: 1.2em;
+}
+
+h5 {
+    font-size: 1em;
+}
+
+li {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+ol ul, ul ol, ul ul, ol ol {
+    padding-left: 1em;
+}
+
+.codehilite {
+    padding-left: 0.5em;
+    border-left: 0.15em solid #999;
+    overflow-x: scroll;
+    max-width: 90vw;
+}

