@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="/style/style.css"/>
+        <link rel="stylesheet" href="/style/code_style.css"/>
+        <title>247CTF</title>
+    </head>
+    <body>
+        <article>
+            <h1>247CTF</h1>
+<h2>Secured Session</h2>
+<p>The challenge description is:</p>
+<blockquote>
+<p>If you can guess our random secret key, we will tell you the flag securely stored in your session.</p>
+</blockquote>
+<p>Opening the web challenge url shows this page:
+<img alt="webpage screenshot of Python Flask code behind the challenge" src="/assets/ctf/2023/247ctf/web_secured_session/website_screenshot.png" /></p>
+<p>The page contains the Python Flask code that the challenge runs on.  There is a randomly generated <code>SECRET_KEY</code> initialised at the start of the application. The URL path <code>/flag</code> can take a <code>secret_key</code> GET parameter, which then is compared with the global <code>SECRET_KEY</code>. If there is a match, the server will return the flag in the response. However, before performing the comparison, the code stores the flag in the client <code>session</code> cookie. In Flask, by default, the session cookie is a base64 encoding of the JSON serialized contents of the <code>session</code> variable.</p>
+<p><img alt="screenshot of the browser showing the cookies stored for this challenge" src="/assets/ctf/2023/247ctf/web_secured_session/cookie.png" /></p>
+<p>Taking the value of the <code>session</code> cookie</p>
+<div class="codehilite"><pre><span></span><code>eyJmbGFnIjp7IiBiIjoiTWpRM1ExUkdlMlJoT0RBM09UVm1PR0UxWTJGaU1tVXdNemRrTnpNNE5UZ3dOMkk1WVRreGZRPT0ifX0.ZEKRAw.8g4JmFzltGhWs-Jzwn0Rmnskjmw
+</code></pre></div>
+
+<p>and decoding it from base64 presents this</p>
+<div class="codehilite"><pre><span></span><code>{&quot;flag&quot;:{&quot; b&quot;:&quot;MjQ3Q1RGe2RhODA3OTVmOGE1Y2FiMmUwMzdkNzM4NTgwN2I5YTkxfQ==&quot;}}[random bytes]
+</code></pre></div>
+
+<p>Finally, the base64 decoded <code>flag</code> value is the challenge flag.</p>
+<div class="codehilite"><pre><span></span><code>247CTF{da80795f8a5cab2e037d7385807b9a91}
+</code></pre></div>
+
+<p><a href="/">Home</a></p>
+        </article>
+        <footer>
+            <small class="ibmvga">this website doesn't use cookies or js</small>
+        <footer>
+    </body>
+</html>
